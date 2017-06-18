@@ -5,6 +5,7 @@ import os
 import shutil
 
 import numpy as np
+import cv2
 import socketio
 import eventlet
 import eventlet.wsgi
@@ -21,6 +22,35 @@ app = Flask(__name__)
 model = None
 prev_image_array = None
 
+# crop camera image to fit nvidia model input shape
+def crop_camera(img):
+        
+    return img[60:140, 10:310]
+
+def resize(image,IMAGE_WIDTH=96,IMAGE_HEIGHT=64):
+    """
+    Resize the image to the input shape used by the network model
+    """
+    return cv2.resize(image, (IMAGE_WIDTH, IMAGE_HEIGHT), cv2.INTER_AREA)
+    
+def rgb2yuv(image):
+     """
+     Convert the image from RGB to YUV (This is what the NVIDIA model does)
+     """
+     return cv2.cvtColor(image, cv2.COLOR_RGB2YUV)
+     
+def rgb2hls(image):
+     """
+     Convert the image from RGB to YUV (This is what the NVIDIA model does)
+     """
+     return cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
+     
+def rgb2hsv(image):
+     """
+     Convert the image from RGB to YUV (This is what the NVIDIA model does)
+     """
+     return cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+     
 
 class SimplePIController:
     def __init__(self, Kp, Ki):
@@ -61,6 +91,13 @@ def telemetry(sid, data):
         imgString = data["image"]
         image = Image.open(BytesIO(base64.b64decode(imgString)))
         image_array = np.asarray(image)
+        image_array = crop_camera(image_array)
+        image_array = resize(image_array)
+        #image_array = rgb2hls(image_array)
+        #image_array = rgb2hsv(image_array)
+        #b,g,r = cv2.split(image_array)
+        #image_array = cv2.merge([r,g,b])
+        #image_array = rgb2yuv(image_array)
         steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
 
         throttle = controller.update(float(speed))

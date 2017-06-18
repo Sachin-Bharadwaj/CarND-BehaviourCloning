@@ -18,13 +18,10 @@ The goals / steps of this project are the following:
 
 [//]: # (Image References)
 
-[image1]: ./examples/placeholder.png "Model Visualization"
-[image2]: ./examples/placeholder.png "Grayscaling"
-[image3]: ./examples/placeholder_small.png "Recovery Image"
-[image4]: ./examples/placeholder_small.png "Recovery Image"
-[image5]: ./examples/placeholder_small.png "Recovery Image"
-[image6]: ./examples/placeholder_small.png "Normal Image"
-[image7]: ./examples/placeholder_small.png "Flipped Image"
+[image1]: ./examples/output_15_0.png "Data Augmentation"
+[image2]: ./examples/output_12_0.png "TrainingSet-Steering angle distribution"
+[image3]: ./examples/output_22_3.png "MSE curves"
+
 
 ## Rubric Points
 ###Here I will consider the [rubric points](https://review.udacity.com/#!/rubrics/432/view) individually and describe how I addressed each point in my implementation.  
@@ -49,24 +46,72 @@ python drive.py model.h5
 ####3. Submission code is usable and readable
 
 The model.py file contains the code for training and saving the convolution neural network. The file shows the pipeline I used for training and validating the model, and it contains comments to explain how the code works.
+Alternatively, I have also included a Ipython notebook which I have used for training and validation purposes, the code in model.py is just a copy and re-formatting of the code in Ipython notebook.
 
 ###Model Architecture and Training Strategy
 
 ####1. An appropriate model architecture has been employed
 
-My model consists of a convolution neural network with 3x3 filter sizes and depths between 32 and 128 (model.py lines 18-24) 
+I did not try to play with model acrchitecture choice too much and hence started with Nvidia model, only made slight changes to it. I added a 1x1 conv layer in starting so that the network can choose its own color channel. However, it should be noted that
+in such a case the network woulld require a decent amount of training data. After the initial 1x1 layer I have Conv->Activation->Maxpooling layers replicated thrice followed by falttening and dropout. The last three layers are dense layer of size 100, 100, 10
+followed by a single neuron in the output layer. I have used Relu activation eevrywhere except the last neuron output. The model summary table is given below:
+____________________________________________________________________________________________________
+Layer (type)                     Output Shape          Param #     Connected to                     
+====================================================================================================
+convolution2d_25 (Convolution2D) (None, 64, 96, 1)     4           convolution2d_input_7[0][0]      
+____________________________________________________________________________________________________
+convolution2d_26 (Convolution2D) (None, 62, 94, 24)    240         convolution2d_25[0][0]           
+____________________________________________________________________________________________________
+activation_37 (Activation)       (None, 62, 94, 24)    0           convolution2d_26[0][0]           
+____________________________________________________________________________________________________
+maxpooling2d_19 (MaxPooling2D)   (None, 31, 47, 24)    0           activation_37[0][0]              
+____________________________________________________________________________________________________
+convolution2d_27 (Convolution2D) (None, 29, 45, 36)    7812        maxpooling2d_19[0][0]            
+____________________________________________________________________________________________________
+activation_38 (Activation)       (None, 29, 45, 36)    0           convolution2d_27[0][0]           
+____________________________________________________________________________________________________
+maxpooling2d_20 (MaxPooling2D)   (None, 14, 22, 36)    0           activation_38[0][0]              
+____________________________________________________________________________________________________
+convolution2d_28 (Convolution2D) (None, 12, 20, 48)    15600       maxpooling2d_20[0][0]            
+____________________________________________________________________________________________________
+activation_39 (Activation)       (None, 12, 20, 48)    0           convolution2d_28[0][0]           
+____________________________________________________________________________________________________
+maxpooling2d_21 (MaxPooling2D)   (None, 6, 10, 48)     0           activation_39[0][0]              
+____________________________________________________________________________________________________
+flatten_7 (Flatten)              (None, 2880)          0           maxpooling2d_21[0][0]            
+____________________________________________________________________________________________________
+dropout_7 (Dropout)              (None, 2880)          0           flatten_7[0][0]                  
+____________________________________________________________________________________________________
+dense_25 (Dense)                 (None, 100)           288100      dropout_7[0][0]                  
+____________________________________________________________________________________________________
+activation_40 (Activation)       (None, 100)           0           dense_25[0][0]                   
+____________________________________________________________________________________________________
+dense_26 (Dense)                 (None, 100)           10100       activation_40[0][0]              
+____________________________________________________________________________________________________
+activation_41 (Activation)       (None, 100)           0           dense_26[0][0]                   
+____________________________________________________________________________________________________
+dense_27 (Dense)                 (None, 10)            1010        activation_41[0][0]              
+____________________________________________________________________________________________________
+activation_42 (Activation)       (None, 10)            0           dense_27[0][0]                   
+____________________________________________________________________________________________________
+dense_28 (Dense)                 (None, 1)             11          activation_42[0][0]              
+====================================================================================================
+Total params: 322,877
+Trainable params: 322,877
+Non-trainable params: 0
 
-The model includes RELU layers to introduce nonlinearity (code line 20), and the data is normalized in the model using a Keras lambda layer (code line 18). 
+The code for the model is given in code cell 16 of Ipython notebook (`build_nvidia_model` function). Alternately, the same function is also present in model.py (line 142-180). 
+
 
 ####2. Attempts to reduce overfitting in the model
 
-The model contains dropout layers in order to reduce overfitting (model.py lines 21). 
+The model contains dropout layers in order to reduce overfitting as stated above. 
 
-The model was trained and validated on different data sets to ensure that the model was not overfitting (code line 10-16). The model was tested by running it through the simulator and ensuring that the vehicle could stay on the track.
+The model was trained and validated on different data sets to ensure that the model was not overfitting. The model was tested by running it through the simulator and ensuring that the vehicle could stay on the track.
 
 ####3. Model parameter tuning
 
-The model used an adam optimizer, so the learning rate was not tuned manually (model.py line 25).
+The model used an adam optimizer, so the learning rate was not tuned manually (see function `build_nvidia_model` in model.py).
 
 ####4. Appropriate training data
 
@@ -80,50 +125,34 @@ For details about how I created the training data, see the next section.
 
 The overall strategy for deriving a model architecture was to ...
 
-My first step was to use a convolution neural network model similar to the ... I thought this model might be appropriate because ...
+My first step was to use a convolution neural network model similar to the nvidia model. I thought this model might be appropriate because it has been used for a similar task by Nividia. I had made some small modification to this architecture as mentioned in `Model Architecture and Training Strategy` above.
+This is by far the most difficult assignment, so I had to spent a lot of time in understanding what is going on with the model. After going through the blog post and discussion of some fellow students, I decide to adopt the following strategy:
+1. Fix the model architecture similar to Nvidia model except added a 1x1 conv layer in front so that the network can choose it's own channel, Further incorporated drop out to reduce overfitting.
+2. In order to reduce the training and resource requirements, in addition to removing the unwanted image portion(like trees, sky), I re-sized the image to 64x96.
+3. Training Data set preparation: This was an iterative step, I started with Udacity training set but it wasn't sufficient, so I added more training images for the track location where the network was failing, added some recovery data , adding more data for the dirt after the bridge and so on.
+4. Further I tried to create a balanced dataset, since most of time the car was moving straight and the network would get biased towards moving straight, so I used the left and right camera images to create a more balanced training set. The code is present in code cell 36 and 40 in Ipython notebook (line 290-330 in model.py)
+5. While training, I performed random horizontal and vertical shifts, random shadows (though this was not essential, the network worked just fine without this step but still added it so that it get generalized better), added random brightness and flips (see function `generator_data`). I also added small amount of multiplicative noise
+to the steering angle (uniformly distributed between normalized anngle of +/-0.1) to account for incorrect steering angle due to driving behaviour on the track.
 
-In order to gauge how well the model was working, I split my image and steering angle data into a training and validation set. I found that my first model had a low mean squared error on the training set but a high mean squared error on the validation set. This implied that the model was overfitting. 
-
-To combat the overfitting, I modified the model so that ...
-
-Then I ... 
-
-The final step was to run the simulator to see how well the car was driving around track one. There were a few spots where the vehicle fell off the track... to improve the driving behavior in these cases, I ....
+In order to gauge how well the model was working, I split my data into training set and test set. No random augmentation (flips/horizontal/vertical/brightness/shadowing) were performed on test set. At the end of training, both the traing error and test error were plotted. Note that I have trained the model incrementally (re-loaded the previous weights and re-trained the network again after adding more recovery data wherever required)
 
 At the end of the process, the vehicle is able to drive autonomously around the track without leaving the road.
 
 ####2. Final Model Architecture
 
-The final model architecture (model.py lines 18-24) consisted of a convolution neural network with the following layers and layer sizes ...
-
-Here is a visualization of the architecture (note: visualizing the architecture is optional according to the project rubric)
-
-![alt text][image1]
+The final model architecture is mentioned in ###1 above (see the function `build_nvidia_model` in model.py lines 142-180) 
 
 ####3. Creation of the Training Set & Training Process
 
-To capture good driving behavior, I first recorded two laps on track one using center lane driving. Here is an example image of center lane driving:
+This set is explained in `Solution Design Approach` above. I present some of the sampled images showing the data augmentation employed while training the network.
 
+
+The image below shows the data augmentation used while training the network
+![alt text][image1]
+
+The figure below shows the distribution of the steering angle in the training data set.
 ![alt text][image2]
 
-I then recorded the vehicle recovering from the left side and right sides of the road back to center so that the vehicle would learn to .... These images show what a recovery looks like starting from ... :
-
+The figure below shows the mean sqaure error curves for the training and the test set
 ![alt text][image3]
-![alt text][image4]
-![alt text][image5]
 
-Then I repeated this process on track two in order to get more data points.
-
-To augment the data sat, I also flipped images and angles thinking that this would ... For example, here is an image that has then been flipped:
-
-![alt text][image6]
-![alt text][image7]
-
-Etc ....
-
-After the collection process, I had X number of data points. I then preprocessed this data by ...
-
-
-I finally randomly shuffled the data set and put Y% of the data into a validation set. 
-
-I used this training data for training the model. The validation set helped determine if the model was over or under fitting. The ideal number of epochs was Z as evidenced by ... I used an adam optimizer so that manually training the learning rate wasn't necessary.
